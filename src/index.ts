@@ -1,10 +1,15 @@
 import { Context, Dict, Random, Schema } from 'koishi'
 import {} from '@koishijs/plugin-rate-limit'
+import { resolve } from 'path'
 
 declare module 'koishi' {
   interface Events {
-    'hangman/win'(output: string[]): void
-    'hangman/lose'(output: string[]): void
+    'hangman/start'(this: Session, state: Stage, output: string[]): void
+    'hangman/stop'(this: Session, state: Stage, output: string[]): void
+    'hangman/win'(this: Session, state: Stage, output: string[]): void
+    'hangman/lose'(this: Session, state: Stage, output: string[]): void
+    'hangman/right'(this: Session, state: Stage, output: string[]): void
+    'hangman/wrong'(this: Session, state: Stage, output: string[]): void
   }
 }
 
@@ -18,15 +23,14 @@ export const Config: Schema<Config> = Schema.object({
   wordList: Schema.string().description('存储单词表的文件路径。'),
 })
 
-interface State extends Word {
+interface Word {
+  text: string
+}
+
+interface Stage extends Word {
   history: string
   chances: number
   current: string
-  extreme?: number
-}
-
-interface Word {
-  text: string
 }
 
 function Word(word: string | Word) {
@@ -35,9 +39,12 @@ function Word(word: string | Word) {
 }
 
 export function apply(ctx: Context, config: Config) {
-  const states: Dict<State> = Object.create(null)
+  const filename = config.wordList
+    ? resolve(ctx.baseDir, config.wordList)
+    : '../words.json'
 
-  const wordList: (string | Word)[] = require(config.wordList || '../words.json')
+  const wordList: (string | Word)[] = require(filename)
+  const stages: Dict<Stage> = Object.create(null)
 
   ctx.i18n.define('zh', require('./locales/zh'))
 
@@ -48,58 +55,60 @@ export function apply(ctx: Context, config: Config) {
     .action(async ({ session, options }, letters = '') => {
       const id = session.cid
 
-      if (!states[id]) {
+      if (!stages[id]) {
         if (letters.length || options.quit) {
           return session.text('.idle')
         }
 
         const word = Word(Random.pick(wordList))
         const current = '?'.repeat(word.text.length)
-        states[id] = { ...word, current, history: '', chances: 10, extreme: 1 }
-        return session.text('.start', [current])
+        stages[id] = { ...word, current, history: '', chances: 10 }
+        const output = [session.text('.start', [current])]
+        ctx.emit(session, 'hangman/start', stages[id], output)
+        return output.join('\n')
       }
 
-      const { current: _current, chances: _chances, history: _history, text } = states[id]
+      const { current: _current, chances: _chances, history: _history, text } = stages[id]
       if (options.quit) {
-        delete states[id]
-        return session.text('.stop')
+        const output = [session.text('.stop')]
+        ctx.emit(session, 'hangman/stop', stages[id], output)
+        delete stages[id]
+        return output.join('\n')
       }
 
       if (!letters.length) {
         if (_history) {
-          return session.text('.history', states[id])
+          return session.text('.history', stages[id])
         } else {
-          return session.text('.history-clean', states[id])
+          return session.text('.history-clean', stages[id])
         }
       }
 
       for (const letter of letters.toLowerCase()) {
-        if (letter < 'a' || letter > 'z' || states[id].history.includes(letter)) continue
+        if (letter < 'a' || letter > 'z' || stages[id].history.includes(letter)) continue
 
-        const history = states[id].history += letter
+        const history = stages[id].history += letter
         if (text.includes(letter)) {
-          const current = states[id].current = text.split('').map(c => history.includes(c) ? c : '?').join('')
+          const current = stages[id].current = text.split('').map(c => history.includes(c) ? c : '?').join('')
           if (current === text) {
-            const answer = session.text('.answer', states[id])
+            const answer = session.text('.answer', stages[id])
             const output = [session.text('.win', [answer, session.username])]
-            delete states[id]
-            ctx.emit('hangman/win', output)
+            delete stages[id]
+            ctx.emit(session, 'hangman/win', stages[id], output)
             return output.join('\n')
           }
         } else {
-          if (!(states[id].chances -= 1)) {
-            const answer = session.text('.answer', states[id])
+          if (!(stages[id].chances -= 1)) {
+            const answer = session.text('.answer', stages[id])
             const output = [session.text('.lose', [answer, session.username])]
-            delete states[id]
-            ctx.emit('hangman/lose', output)
+            delete stages[id]
+            ctx.emit(session, 'hangman/lose', stages[id], output)
             return output.join('\n')
-          } else if (states[id].current === '?'.repeat(text.length)) {
-            states[id].extreme += 1
           }
         }
       }
 
-      const { chances, history } = states[id]
+      const { chances, history } = stages[id]
       const charCount = history.length - _history.length
       if (!charCount) {
         if (letters.match(/[a-zA-Z]/)) {
@@ -110,9 +119,13 @@ export function apply(ctx: Context, config: Config) {
       }
 
       if (_chances - chances === charCount) {
-        return session.text('.wrong', states[id])
+        const output = [session.text('.wrong', stages[id])]
+        ctx.emit(session, 'hangman/wrong', stages[id], output)
+        return output.join('\n')
       } else {
-        return session.text('.right', states[id])
+        const output = [session.text('.right', stages[id])]
+        ctx.emit(session, 'hangman/right', stages[id], output)
+        return output.join('\n')
       }
     })
 }
