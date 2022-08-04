@@ -3,62 +3,73 @@ import {} from '@koishijs/plugin-rate-limit'
 
 declare module 'koishi' {
   interface Events {
-    'hangman/success'(output: string[]): void
+    'hangman/win'(output: string[]): void
+    'hangman/lose'(output: string[]): void
   }
 }
 
 export const name = 'hangman'
 
-export interface Config {}
+export interface Config {
+  wordList?: string
+}
 
-export const Config: Schema<Config> = Schema.object({})
+export const Config: Schema<Config> = Schema.object({
+  wordList: Schema.string().description('存储单词表的文件路径。'),
+})
 
-interface State {
-  word: string
-  src: string
-  type: string
+interface State extends Word {
   history: string
   chances: number
   current: string
   extreme?: number
 }
 
-export function apply(ctx: Context) {
+interface Word {
+  text: string
+}
+
+function Word(word: string | Word) {
+  if (typeof word !== 'string') return word
+  return { text: word }
+}
+
+export function apply(ctx: Context, config: Config) {
   const states: Dict<State> = Object.create(null)
 
-  ctx.command('hangman [letter:string]', '吊死鬼')
+  const wordList: (string | Word)[] = require(config.wordList || '../words.json')
+
+  ctx.i18n.define('zh', require('./locales/zh'))
+
+  ctx.command('hangman [letter:string]')
     .alias('hang', 'dsg')
     .shortcut('吊死鬼', { fuzzy: true })
-    .option('quit', '-q  退出游戏', { notUsage: true })
-    .usage([
-      '系统将生成一个随机的英文词汇，玩家的目标是猜出这个词，共有 10 次尝试机会。',
-      '每次可以猜测一个字母，如果在词中出现则会提示出现位置，否则会消耗一次尝试机会。尝试机会用完则游戏失败。',
-    ].join('\n'))
+    .option('quit', '-q', { notUsage: true })
     .action(async ({ session, options }, letters = '') => {
       const id = session.cid
 
       if (!states[id]) {
         if (letters.length || options.quit) {
-          return '没有正在进行的吊死鬼游戏。输入“吊死鬼”开始一轮游戏。'
+          return session.text('.idle')
         }
 
-        const [word, src, type] = Random.pick(wordList)
-        const current = '?'.repeat(word.length)
-        states[id] = { word, src, type, current, history: '', chances: 10, extreme: 1 }
-        return `游戏开始，要猜的词为 ${current}，剩余 10 次机会。`
+        const word = Word(Random.pick(wordList))
+        const current = '?'.repeat(word.text.length)
+        states[id] = { ...word, current, history: '', chances: 10, extreme: 1 }
+        return session.text('.start', [current])
       }
 
-      const { current: _current, chances: _chances, history: _history, word, src, type } = states[id]
+      const { current: _current, chances: _chances, history: _history, text } = states[id]
       if (options.quit) {
         delete states[id]
-        return '游戏已停止。'
+        return session.text('.stop')
       }
 
       if (!letters.length) {
         if (_history) {
-          return `当前要猜的词为 ${_current}，已使用的字母为 ${_history}，剩余 ${_chances} 次机会。`
+          return session.text('.history', states[id])
         } else {
-          return `当前要猜的词为 ${_current}，剩余 ${_chances} 次机会。`
+          return session.text('.history-clean', states[id])
         }
       }
 
@@ -66,36 +77,42 @@ export function apply(ctx: Context) {
         if (letter < 'a' || letter > 'z' || states[id].history.includes(letter)) continue
 
         const history = states[id].history += letter
-        if (word.includes(letter)) {
-          const current = states[id].current = word.split('').map(c => history.includes(c) ? c : '?').join('')
-          if (current === word) {
-            const output = [
-              `尝试成功！恭喜 ${session.username} 回答正确！`,
-              `正确答案为：${word}，来源：${src}（${type}）。`,
-            ]
+        if (text.includes(letter)) {
+          const current = states[id].current = text.split('').map(c => history.includes(c) ? c : '?').join('')
+          if (current === text) {
+            const answer = session.text('.answer', states[id])
+            const output = [session.text('.win', [answer, session.username])]
             delete states[id]
+            ctx.emit('hangman/win', output)
             return output.join('\n')
           }
         } else {
           if (!(states[id].chances -= 1)) {
+            const answer = session.text('.answer', states[id])
+            const output = [session.text('.lose', [answer, session.username])]
             delete states[id]
-            return `尝试失败！由于机会已耗尽，游戏结束。\n正确答案为：${word}，来源：${src}（${type}）。`
-          } else if (states[id].current === '?'.repeat(word.length)) {
+            ctx.emit('hangman/lose', output)
+            return output.join('\n')
+          } else if (states[id].current === '?'.repeat(text.length)) {
             states[id].extreme += 1
           }
         }
       }
 
-      const { current, chances, history } = states[id]
+      const { chances, history } = states[id]
       const charCount = history.length - _history.length
       if (!charCount) {
         if (letters.match(/[a-zA-Z]/)) {
-          return '该字母已经使用过，换一个叭~'
+          return session.text('.char-used')
         } else {
-          return '请输入英文字母进行猜测。'
+          return session.text('.char-invalid')
         }
       }
 
-      return `尝试${_chances - chances === charCount ? '失败' : '成功'}！剩余字母为 ${current}，已使用的字母为 ${history}，剩余 ${chances} 次机会。`
+      if (_chances - chances === charCount) {
+        return session.text('.wrong', states[id])
+      } else {
+        return session.text('.right', states[id])
+      }
     })
 }
