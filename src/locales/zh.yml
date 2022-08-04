@@ -1,6 +1,6 @@
 commands:
   hangman:
-    description: 吊死鬼
+    description: 猜单词
     options:
       quit: 退出游戏
     usage: |

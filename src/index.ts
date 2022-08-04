@@ -16,10 +16,12 @@ declare module 'koishi' {
 export const name = 'hangman'
 
 export interface Config {
+  chances?: number
   wordList?: string
 }
 
 export const Config: Schema<Config> = Schema.object({
+  chances: Schema.number().default(10).description('允许猜测的最大次数。'),
   wordList: Schema.string().description('存储单词表的文件路径。'),
 })
 
@@ -62,7 +64,7 @@ export function apply(ctx: Context, config: Config) {
 
         const word = Word(Random.pick(wordList))
         const current = '?'.repeat(word.text.length)
-        stages[id] = { ...word, current, history: '', chances: 10 }
+        stages[id] = { ...word, current, history: '', chances: config.chances }
         const output = [session.text('.start', [current])]
         ctx.emit(session, 'hangman/start', stages[id], output)
         return output.join('\n')
