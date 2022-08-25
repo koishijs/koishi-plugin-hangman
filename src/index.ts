@@ -22,7 +22,7 @@ export interface Config {
 
 export const Config: Schema<Config> = Schema.object({
   chances: Schema.number().default(10).description('允许猜测的最大次数。'),
-  wordList: Schema.string().description('存储单词表的文件路径。'),
+  wordList: Schema.string().description('存储单词表的文件路径。').hidden(process.env.KOISHI_ENV === 'browser'),
 })
 
 interface Word {
@@ -41,11 +41,16 @@ function Word(word: string | Word) {
 }
 
 export function apply(ctx: Context, config: Config) {
-  const filename = config.wordList
-    ? resolve(ctx.baseDir, config.wordList)
-    : '../words.json'
+  function getWordList(): (string | Word)[] {
+    if (process.env.KOISHI_ENV === 'browser' || !config.wordList) {
+      return require('../words.json')
+    } else {
+      const filename = resolve(ctx.baseDir, config.wordList)
+      return require(filename)
+    }
+  }
 
-  const wordList: (string | Word)[] = require(filename)
+  const wordList = getWordList()
   const stages: Dict<Stage> = Object.create(null)
 
   ctx.i18n.define('zh', require('./locales/zh'))
