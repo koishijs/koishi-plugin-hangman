@@ -10,9 +10,9 @@
     "incremental": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
   },
   "include": [
-    "src"
-  ]
+    "src",
+  ],
 }

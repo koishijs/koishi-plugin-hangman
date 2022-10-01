@@ -1,5 +1,6 @@
 # koishi-plugin-hangman
 
+[![Codecov](https://img.shields.io/codecov/c/hangman/koishijs/koishi-plugin-hangman?style=flat-square)](https://codecov.io/gh/koishijs/koishi-plugin-hangman)
 [![npm](https://img.shields.io/npm/v/koishi-plugin-hangman?style=flat-square)](https://www.npmjs.com/package/koishi-plugin-hangman)
 
 猜单词 (吊死鬼) 游戏。
