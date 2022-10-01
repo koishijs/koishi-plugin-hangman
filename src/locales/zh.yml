@@ -9,7 +9,7 @@ commands:
     messages:
       idle: 没有正在进行的吊死鬼游戏。输入“吊死鬼”开始一轮游戏。
       start: 游戏开始，要猜的词为 {0}，剩余 10 次机会。
-      stop: 游戏开始，要猜的词为 {0}，剩余 10 次机会。
+      stop: 游戏结束。
       history-clean: 当前要猜的词为 {current}，剩余 {chances} 次机会。
       history: 当前要猜的词为 {current}，已使用的字母为 {history}，剩余 {chances} 次机会。
       right: 尝试成功！剩余字母为 {current}，已使用的字母为 {history}，剩余 {chances} 次机会。
