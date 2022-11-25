@@ -53,7 +53,7 @@ export function apply(ctx: Context, config: Config) {
   const wordList = getWordList()
   const stages: Dict<Stage> = Object.create(null)
 
-  ctx.i18n.define('zh', require('./locales/zh'))
+  ctx.i18n.define('zh', require('./locales/zh-CN'))
 
   ctx.command('hangman [letter:string]')
     .alias('hang', 'dsg')
