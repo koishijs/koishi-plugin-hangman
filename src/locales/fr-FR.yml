@@ -1,0 +1,25 @@
+commands:
+  hangman:
+    description: 猜单词
+    options:
+      quit: 退出游戏
+    usage: |-
+      系统将生成一个随机的英文词汇，玩家的目标是猜出这个词，共有 10 次尝试机会。
+      每次可以猜测一个字母，如果在词中出现则会提示出现位置，否则会消耗一次尝试机会。尝试机会用完则游戏失败。
+    messages:
+      idle: 没有正在进行的吊死鬼游戏。输入“吊死鬼”开始一轮游戏。
+      start: 游戏开始，要猜的词为 {0}，剩余 10 次机会。
+      stop: 游戏结束。
+      history-clean: 当前要猜的词为 {current}，剩余 {chances} 次机会。
+      history: 当前要猜的词为 {current}，已使用的字母为 {history}，剩余 {chances} 次机会。
+      right: 尝试成功！剩余字母为 {current}，已使用的字母为 {history}，剩余 {chances} 次机会。
+      wrong: 尝试失败！剩余字母为 {current}，已使用的字母为 {history}，剩余 {chances} 次机会。
+      answer: '{text}'
+      win: |-
+        尝试成功！恭喜 {1} 回答正确！
+        正确答案为：{0}。
+      lose: |-
+        尝试失败！由于机会已耗尽，游戏结束。
+        正确答案为：{0}。
+      char-used: 该字母已经使用过，换一个叭~
+      char-invalid: 请输入英文字母进行猜测。
