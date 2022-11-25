@@ -1,6 +1,6 @@
 commands:
   hangman:
-    description: 猜单词
+    description: hangman
     options:
       quit: 退出游戏
     usage: |-
