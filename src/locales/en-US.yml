@@ -2,7 +2,7 @@ commands:
   hangman:
     description: hangman
     options:
-      quit: 退出游戏
+      quit: Quit the game
     usage: |-
       系统将生成一个随机的英文词汇，玩家的目标是猜出这个词，共有 10 次尝试机会。
       每次可以猜测一个字母，如果在词中出现则会提示出现位置，否则会消耗一次尝试机会。尝试机会用完则游戏失败。
