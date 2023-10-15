@@ -1,5 +1,5 @@
-import { Context, Dict, Random, Schema } from 'koishi'
-import {} from '@koishijs/plugin-rate-limit'
+import { Context, Dict, Random, Schema, Session } from 'koishi'
+import {} from 'koishi-plugin-rate-limit'
 import { resolve } from 'path'
 
 declare module 'koishi' {
@@ -18,11 +18,17 @@ export const name = 'hangman'
 export interface Config {
   chances?: number
   wordList?: string
+  submission: 'strict' | 'loose' | 'mention'
 }
 
 export const Config: Schema<Config> = Schema.object({
   chances: Schema.number().default(10).description('允许猜测的最大次数。'),
   wordList: Schema.string().description('存储单词表的文件路径。').hidden(process.env.KOISHI_ENV === 'browser'),
+  submission: Schema.union([
+    Schema.const('strict').description('只接受指令输入'),
+    Schema.const('loose').description('允许直接输入答案文本'),
+    Schema.const('mention').description('仅在私聊或被提及时接受直接输入'),
+  ]).role('radio').description('答案提交方式。').default('mention'),
 })
 
 interface Word {
@@ -53,11 +59,23 @@ export function apply(ctx: Context, config: Config) {
   const wordList = getWordList()
   const stages: Dict<Stage> = Object.create(null)
 
-  ctx.i18n.define('zh', require('./locales/zh-CN'))
+  ctx.i18n.define('zh-CN', require('./locales/zh-CN'))
+
+  ctx.middleware(async (session, next) => {
+    const state = stages[session.cid]
+    if (!state || config.submission === 'strict') return next()
+    const { content, atSelf } = session.stripped
+    if (!session.isDirect && !atSelf && config.submission !== 'loose') return next()
+    if (!/^[a-z]+$/i.test(content)) return next()
+    return session.execute({
+      name: 'hangman',
+      args: [content],
+    })
+  })
 
   ctx.command('hangman [letter:string]')
-    .alias('hang', 'dsg')
-    .shortcut('吊死鬼', { fuzzy: true })
+    .alias('hang')
+    .alias('吊死鬼')
     .option('quit', '-q', { notUsage: true })
     .action(async ({ session, options }, letters = '') => {
       const id = session.cid
@@ -75,7 +93,7 @@ export function apply(ctx: Context, config: Config) {
         return output.join('\n')
       }
 
-      const { current: _current, chances: _chances, history: _history, text } = stages[id]
+      const { chances: _chances, history: _history, text } = stages[id]
       if (options.quit) {
         const output = [session.text('.stop')]
         ctx.emit(session, 'hangman/stop', stages[id], output)
